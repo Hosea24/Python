@@ -1,9 +1,12 @@
 import PySimpleGUI as sg
+from arcade import Scene
 import numpy as np
+import time
 
 sg.theme('LightGrey2')
 
 remain=0
+running=None
 def mark(e,findtile,arr,scene):
     r,c= findtile.get(e.widget)
     if arr[r][c] & 32:return
@@ -44,7 +47,9 @@ def revblock(r,c,arr,w,h,scene):
 
 
 def reveal(r,c,arr,w,h,scene):
-    global remain
+    global remain,running,starttime
+    if not running:
+        running=time.time()
     if arr[r][c]&128:
         scene[f'g{str(r)}.{str(c)}'].update(button_color='red')
         for row in range(h):
@@ -60,6 +65,8 @@ def reveal(r,c,arr,w,h,scene):
                 else:
                     scene[f'g{str(row)}.{str(col)}'].Widget.config(relief='sunken', overrelief='')
         sg.Window('游戏失败',[[sg.Text('非常不幸，触雷失败')],[sg.Push(),sg.Button('确定'),sg.Push()]]).read(close=True,timeout=5000)
+        scene.TKroot.after_cancel(running)
+        running=None
         return 0
     elif arr[r][c] & 64 or arr[r][c] & 32:
         return 0
@@ -84,7 +91,7 @@ def resstart(w,h,m,s):
 def Main(w,h,m):
     board=genborad(w,h,m)
     findtile={}
-    global remain
+    global remain,running
     remain=w*h-m
     ground=[[sg.Button(" ",size=(2,1),pad=0,key=f'g{str(r)}.{str(c)}') for r in range(h)] for c in range(w)]     
     view=[[sg.Text("计时："),sg.Text("0",key='time'),sg.Push(),sg.T("剩余"),sg.T(remain,key='remain')],ground,[sg.T("宽"),sg.In(s=3,key='width'),sg.Push(),sg.T("高"),sg.In(s=3,key='height'),sg.Push(),sg.T("雷"),sg.In(s=3,key='mine'),sg.Push(),sg.B('开始',key='reset',focus=True)]]
@@ -98,8 +105,8 @@ def Main(w,h,m):
             scene[f'g{str(r)}.{str(c)}'].Widget.bind('<Button-3>', lambda e: mark(e,findtile,board,scene))
             findtile[scene[f'g{str(r)}.{str(c)}'].Widget]=(r,c)    
     while True:
-        event,vals=scene.read()
-        print(event, vals)
+        event,vals=scene.read(500)
+        print(event, vals) if event!="__TIMEOUT__" else None
         if event == sg.WIN_CLOSED or event == 'Exit':
             break
         elif event.startswith('g'):
@@ -109,12 +116,16 @@ def Main(w,h,m):
             print(remain)
             if remain==0:
                 sg.Window('游戏成功',[[sg.Text('你真厉害，成功完成')],[sg.Push(),sg.Button('确定'),sg.Push()]]).read(close=True)
+                scene.TKroot.after_cancel(running)
+                running=None
         elif event=="reset":
             w=int(vals['width'])
             h=int(vals['height'])
             m=int(vals['mine'])
             scene.close()
             Main(w,h,m)
+        if running:
+            scene['time'](round(time.time() - running))
     scene.close()
 
 
