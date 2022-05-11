@@ -16,6 +16,7 @@ def mark(e,findtile,arr,scene):
         scene[f'g{str(r)}.{str(c)}'].update(text='⚑')
     arr[r][c]^=64
 
+# uint8位数据，128为是不是雷，64为是否插旗，32为是否翻开
 def genborad(row,col,mine):
     l=(row*col-mine)*[0]+[128]*mine
     arr=np.array(l,dtype=np.uint8)
@@ -50,7 +51,9 @@ def reveal(r,c,arr,w,h,scene):
     global remain,running,starttime
     if not running:
         running=time.time()
-    if arr[r][c]&128:
+    if arr[r][c] & 64:
+        return 0
+    elif arr[r][c]&128:
         scene[f'g{str(r)}.{str(c)}'].update(button_color='red')
         for row in range(h):
             for col in range(w):
@@ -68,8 +71,18 @@ def reveal(r,c,arr,w,h,scene):
         scene.TKroot.after_cancel(running)
         running=None
         return 0
-    elif arr[r][c] & 64 or arr[r][c] & 32:
-        return 0
+    elif arr[r][c] & 32:    # 点击已经翻开的格子
+        num=arr[r][c] & 15  # 取出当前格的数字
+        for nr in range(max(r-1,0),min(r+2,len(arr))):
+            for nc in range(max(c-1,0),min(c+2,len(arr))):
+                if arr[nr][nc] & 64: # 如果已经标旗子
+                    num-=1
+        if num==0:  # 已标旗数与数字吻合，模拟点击其它格子
+            for nr in range(max(r-1,0),min(r+2,len(arr))):
+                for nc in range(max(c-1,0),min(c+2,len(arr))):
+                    if arr[nr][nc] & 32==0:
+                        reveal(nr,nc,arr,w,h,scene)
+
     elif arr[r][c]>0:
         arr[r][c] |= 32  # 表示翻开
         scene[f'g{str(r)}.{str(c)}'].Widget.config(relief='sunken', overrelief='')
